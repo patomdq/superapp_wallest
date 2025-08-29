@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Super App Wallest</title>
+    <!-- Tailwind (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React 18 UMD + Babel para JSX en el navegador (MVP sin build) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      function MbaDailyKpis() {
+        const [modo, setModo] = useState("mba12");
+        const semanas30 = [
+          { id: 1, titulo: "Semana 1 — Encendido y Ritmo" },
+          { id: 2, titulo: "Semana 2 — Expansión de Radar" },
+          { id: 3, titulo: "Semana 3 — Finanzas y Caza" },
+          { id: 4, titulo: "Semana 4 — Integración y Escala" },
+        ];
+        const semanas12 = [
+          { id: 1, titulo: "Semana 1 — Sistema y Disciplina" },
+          { id: 2, titulo: "Semana 2 — Estrategia & Territorio" },
+          { id: 3, titulo: "Semana 3 — Finanzas I: Fundamentos" },
+          { id: 4, titulo: "Semana 4 — Finanzas II: Flujo y Valor" },
+          { id: 5, titulo: "Semana 5 — Escalado y Sistemas" },
+          { id: 6, titulo: "Semana 6 — Marketing & Capital Raising" },
+          { id: 7, titulo: "Semana 7 — Operaciones Inmobiliarias Avanzadas" },
+          { id: 8, titulo: "Semana 8 — Liderazgo & Psicología del CEO" },
+          { id: 9, titulo: "Semana 9 — Negociación Dura" },
+          { id: 10, titulo: "Semana 10 — Gestión de Riesgo" },
+          { id: 11, titulo: "Semana 11 — Construcción de Marca y Red" },
+          { id: 12, titulo: "Semana 12 — Integración & Plan 2027" },
+        ];
+
+        const materials = {
+          mba12: {
+            1: { title: "Semana 1 — Sistema y Disciplina", items: [
+              "Lectura: El año de las 12 semanas (Brian Moran)",
+              "Vídeo: Quarterly Planning (YouTube)",
+              "Ejercicio: definir 3 KPIs del trimestre",
+            ]},
+            2: { title: "Semana 2 — Estrategia & Territorio", items: [
+              "Lectura: El arte de la guerra (Sun Tzu)",
+              "Vídeo: Las 5 fuerzas de Porter",
+              "Ejercicio: mapa de competencia/aliados",
+            ]},
+          },
+          mba30: {
+            1: { title: "Semana 1 — Encendido y Ritmo", items: [
+              "Rutina: 06:30 + práctica AM + entreno",
+              "MBA: Semana 1 (mismo contenido del plan de 12)",
+              "Negocio: 2 visitas agendadas",
+              "Tech: usar app Diario todos los días",
+            ]},
+            2: { title: "Semana 2 — Expansión de Radar", items: [
+              "Doble práctica (AM/PM)",
+              "Mapa de competencia/aliados",
+              "2 dossiers a 5 inversores",
+              "Checklist due diligence digitalizado",
+            ]},
+          },
+        };
+
+        const [semana, setSemana] = useState(1);
+        const [checks, setChecks] = useState({ lectura: false, video: false, ejercicio: false, diario: false });
+        const [kpis, setKpis] = useState({ llamadasApis: 0, reunionesInv: 0, visitas: 0, ofertas: 0 });
+        const [notas, setNotas] = useState("");
+        const [toast, setToast] = useState("");
+        const [showMaterials, setShowMaterials] = useState(false);
+
+        const totalChecks = Object.values(checks).filter(Boolean).length;
+        const progreso = Math.round((totalChecks / 4) * 100);
+
+        const inc = (key) => setKpis((s) => ({ ...s, [key]: s[key] + 1 }));
+        const dec = (key) => setKpis((s) => ({ ...s, [key]: Math.max(0, s[key] - 1) }));
+
+        const buildPayload = () => ({
+          fechaISO: new Date().toISOString(),
+          plan: modo === 'mba12' ? 'MBA 12 Semanas' : 'Plan 30 Días',
+          semana,
+          checks,
+          kpis,
+          notas,
+        });
+
+        const pushToast = (msg) => { setToast(msg); window.setTimeout(() => setToast(""), 2200); };
+
+        const exportJson = async () => {
+          const dataStr = JSON.stringify(buildPayload(), null, 2);
+          try { await navigator.clipboard.writeText(dataStr); pushToast("Jornada copiada al portapapeles"); } catch {}
+          try {
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `wallest_jornada_${new Date().toISOString().slice(0,10)}.json`; a.click();
+            URL.revokeObjectURL(url);
+          } catch {}
+        };
+
+        async function saveToAirtable() {
+          // En versión "HTML estático" no hay backend. Deja preparado el POST para cuando montemos el proxy.
+          try {
+            const res = await fetch("/api/saveJornada", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(buildPayload()),
+            });
+            pushToast(res.ok ? "Jornada guardada en Airtable" : "Backend no disponible");
+          } catch (e) { pushToast("Backend no disponible"); }
+        }
+
+        const activeMaterials = (modo === 'mba12' ? materials.mba12 : materials.mba30)[semana];
+
+        return (
+          <div className="space-y-6 relative">
+            {toast && (<div className="fixed bottom-4 right-4 bg-black text-white rounded-2xl px-3 py-2 text-sm shadow z-50">{toast}</div>)}
+
+            {showMaterials && (
+              <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-40">
+                <div className="bg-white rounded-2xl p-6 max-w-lg w-full">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold">Materiales — {activeMaterials?.title || 'Semana seleccionada'}</h4>
+                    <button onClick={() => setShowMaterials(false)} className="w-8 h-8 rounded-full bg-gray-100">×</button>
+                  </div>
+                  <ul className="list-disc pl-5 text-sm space-y-1">
+                    {(activeMaterials?.items || ["Ver temario completo en documentación"]).map((txt, i) => (
+                      <li key={i}>{txt}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold">MBA Wallest</h3>
+                <p className="text-sm text-gray-600">Selecciona el plan y registra tu jornada</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setModo('mba12'); setSemana(1); }} className={`px-3 py-2 rounded-2xl shadow ${modo === 'mba12' ? 'bg-black text-white' : 'bg-white'}`}>Plan 12 Semanas</button>
+                <button onClick={() => { setModo('mba30'); setSemana(1); }} className={`px-3 py-2 rounded-2xl shadow ${modo === 'mba30' ? 'bg-black text-white' : 'bg-white'}`}>Plan 30 Días</button>
+                <select value={semana} onChange={(e) => setSemana(Number(e.target.value))} className="bg-white rounded-2xl px-3 py-2 shadow">
+                  {(modo === 'mba12' ? semanas12 : semanas30).map((s) => (<option key={s.id} value={s.id}>{s.titulo}</option>))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="col-span-1 bg-white rounded-2xl p-5 shadow">
+                <div className="flex items-center justify-between mb-3"><h4 className="font-semibold">Progreso diario</h4><span className="text-sm text-gray-500">{progreso}%</span></div>
+                <div className="w-full h-3 bg-gray-200 rounded-full mb-4"><div className="h-3 bg-black rounded-full" style={{ width: `${progreso}%` }} /></div>
+                <ul className="space-y-2">
+                  {[
+                    { key: "lectura", label: "Lectura 30'" },
+                    { key: "video", label: "Vídeo/apunte 30'" },
+                    { key: "ejercicio", label: "Ejercicio aplicado 30'" },
+                    { key: "diario", label: "Diario de 3 preguntas" },
+                  ].map((item) => (
+                    <li key={item.key} className="flex items-center justify-between">
+                      <label className="flex items-center gap-2">
+                        <input type="checkbox" className="w-4 h-4" checked={checks[item.key]} onChange={(e) => setChecks({ ...checks, [item.key]: e.target.checked })} />
+                        <span>{item.label}</span>
+                      </label>
+                      {checks[item.key] && <span className="text-xs text-green-600">OK</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="col-span-1 bg-white rounded-2xl p-5 shadow">
+                <h4 className="font-semibold mb-3">KPIs del día</h4>
+                <div className="space-y-3">
+                  {[
+                    { key: "llamadasApis", label: "Llamadas APIs/servicers", target: ">=10" },
+                    { key: "reunionesInv", label: "Reuniones inversores", target: ">=1/3d" },
+                    { key: "visitas", label: "Visitas a inmuebles", target: ">=1/día" },
+                    { key: "ofertas", label: "Ofertas redactadas", target: ">=2/sem" },
+                  ].map((k) => (
+                    <div key={k.key} className="border rounded-2xl p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{k.label}</p>
+                          <p className="text-xs text-gray-500">Objetivo: {k.target}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button aria-label={`Disminuir ${k.label}`} onClick={() => dec(k.key)} disabled={kpis[k.key] === 0} className="w-8 h-8 rounded-full bg-gray-100 disabled:opacity-40">−</button>
+                          <input type="number" inputMode="numeric" value={kpis[k.key]} onChange={(e) => setKpis((s) => ({ ...s, [k.key]: Math.max(0, parseInt(e.target.value || '0', 10)) }))} className="w-14 text-center font-semibold border rounded-xl py-1" />
+                          <button aria-label={`Aumentar ${k.label}`} onClick={() => inc(k.key)} className="w-8 h-8 rounded-full bg-black text-white">+</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="col-span-1 bg-white rounded-2xl p-5 shadow">
+                <h4 className="font-semibold mb-3">Notas rápidas / bloqueos</h4>
+                <textarea value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Escribe bloqueos, decisiones o recordatorios accionables..." className="w-full h-40 p-3 border rounded-2xl focus:outline-none" />
+                <div className="text-xs text-gray-500 mt-2">Consejo HASU: si hay bloqueo → define la micro-acción de 5'.</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 shadow">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <p className="text-sm text-gray-600">Semana activa</p>
+                  <p className="font-semibold">{(modo === 'mba12' ? semanas12 : semanas30).find((s) => s.id === semana)?.titulo}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setShowMaterials(true)} className="px-4 py-2 rounded-2xl bg-black text-white">Ver materiales</button>
+                  <button onClick={exportJson} className="px-4 py-2 rounded-2xl bg-gray-100">Guardar jornada</button>
+                  <button onClick={saveToAirtable} className="px-4 py-2 rounded-2xl bg-gray-100">Enviar a Airtable (MVP)</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function HQSystem() {
+        const data = { capitalDisponible: 0, vidaUtilDias: 0, patrimonioNeto: 0 };
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-2xl p-5 shadow"><p className="text-sm text-gray-600">Capital disponible</p><p className="text-2xl font-bold">€ {data.capitalDisponible}</p></div>
+              <div className="bg-white rounded-2xl p-5 shadow"><p className="text-sm text-gray-600">Vida útil</p><p className="text-2xl font-bold">{data.vidaUtilDias} días</p></div>
+              <div className="bg-white rounded-2xl p-5 shadow"><p className="text-sm text-gray-600">Patrimonio neto</p><p className="text-2xl font-bold">€ {data.patrimonioNeto}</p></div>
+            </div>
+            <div className="bg-gray-50 rounded-2xl p-4 border">
+              <p className="text-sm text-gray-600 mb-3">Integración pendiente → Airtable (HQ, Finanzas, Proyectos, Estrategia).</p>
+              <button className="px-4 py-2 rounded-2xl bg-black text-white">Conectar Airtable (MVP)</button>
+            </div>
+          </div>
+        );
+      }
+
+      function CoachTab() {
+        const [running, setRunning] = React.useState(false);
+        const [seconds, setSeconds] = React.useState(300);
+        React.useEffect(() => { if (!running) return; const id = setInterval(() => setSeconds((s) => (s > 0 ? s - 1 : 0)), 1000); return () => clearInterval(id); }, [running]);
+        const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+        const ss = String(seconds % 60).padStart(2, "0");
+        return (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl p-6 shadow flex items-center justify-between">
+              <div><h3 className="text-lg font-semibold">Sesión rápida con el Coach</h3><p className="text-sm text-gray-600">Resuelve un bloqueo en 5 minutos.</p></div>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xl">{mm}:{ss}</span>
+                {!running ? (
+                  <button onClick={() => { setSeconds(300); setRunning(true); }} className="px-4 py-2 rounded-2xl bg-black text-white">Comenzar sesión 5'</button>
+                ) : (
+                  <button onClick={() => setRunning(false)} className="px-4 py-2 rounded-2xl bg-gray-100">Pausar</button>
+                )}
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow"><h4 className="font-semibold mb-2">Habla con el Coach</h4><p className="text-sm text-gray-600 mb-3">MVP: botón para abrir chat del Coach Wallest.</p><button className="px-4 py-2 rounded-2xl bg-black text-white">Hablar con el Coach</button></div>
+          </div>
+        );
+      }
+
+      function App() {
+        const [activeTab, setActiveTab] = useState("sistema");
+        return (
+          <div className="min-h-screen bg-gray-100 p-6">
+            <div className="mb-6"><h1 className="text-2xl font-bold text-center">Super App Wallest</h1></div>
+            <div className="flex justify-center space-x-4 mb-6">
+              <button onClick={() => setActiveTab("sistema")} className={`px-4 py-2 rounded-2xl shadow ${activeTab === 'sistema' ? 'bg-black text-white' : 'bg-white'}`}>Sistema Wallest</button>
+              <button onClick={() => setActiveTab("mba")} className={`px-4 py-2 rounded-2xl shadow ${activeTab === 'mba' ? 'bg-black text-white' : 'bg-white'}`}>MBA Wallest</button>
+              <button onClick={() => setActiveTab("coach")} className={`px-4 py-2 rounded-2xl shadow ${activeTab === 'coach' ? 'bg-black text-white' : 'bg-white'}`}>Coach Wallest</button>
+            </div>
+            <div className="bg-white rounded-2xl shadow-md p-6">
+              {activeTab === 'sistema' && <HQSystem />}
+              {activeTab === 'mba' && <MbaDailyKpis />}
+              {activeTab === 'coach' && <CoachTab />}
+            </div>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
