@@ -7,6 +7,19 @@
 />
 
 import React, { useState, useEffect } from "react";
+export default function App() {
+  return (
+    <>
+      <div className="w-full h-[80vh] p-4">
+        <iframe
+          src="https://airtable.com/appDbcUJDh3KLo70L/shrBDLlxk1qEYSyLp"
+          width="100%"
+          height="100%"
+          style={{ border: "none", borderRadius: "12px" }}
+          title="HQ Wallest"
+        />
+      </div>
+
 <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-40">
 <div className="bg-white rounded-2xl p-6 max-w-lg w-full">
 <div className="flex items-center justify-between mb-3">
