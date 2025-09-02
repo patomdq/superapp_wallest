@@ -1,11 +1,3 @@
-<iframe 
-  src="https://airtable.com/appDbcUJDh3KLo70L/shrBDLlxKlqEYsyLp" 
-  width="100%" 
-  height="600" 
-  style={{ border: "none", borderRadius: "12px" }}
-  title="HQ Wallest"
-/>
-
 import React, { useState, useEffect } from "react";
 export default function App() {
   return (
